@@ -17,6 +17,7 @@ var (
 	receiveOut    string
 	receiveToken  string
 	receiveResume bool
+	receivePin    string
 )
 
 var receiveCmd = &cobra.Command{
@@ -49,6 +50,9 @@ var receiveCmd = &cobra.Command{
 		}
 		if token != "" {
 			req.Header.Set("Authorization", "Bearer "+token)
+		}
+		if pin := pinFor(receivePin); pin != "" {
+			req.Header.Set("X-PIN", pin)
 		}
 		if offset > 0 {
 			req.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
@@ -95,9 +99,7 @@ func verifyDownload(host, token, remote, local string) error {
 	if err != nil {
 		return err
 	}
-	if token != "" {
-		req.Header.Set("Authorization", "Bearer "+token)
-	}
+	setAuth(req, token, pinFor(receivePin))
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
 		return err
@@ -131,5 +133,6 @@ func init() {
 	receiveCmd.Flags().StringVar(&receiveOut, "out", "", "output file or directory")
 	receiveCmd.Flags().StringVar(&receiveToken, "token", "", "server token (or LANBOX_TOKEN)")
 	receiveCmd.Flags().BoolVar(&receiveResume, "resume", false, "resume from existing partial file")
+	receiveCmd.Flags().StringVar(&receivePin, "pin", "", "server PIN (or LANBOX_PIN)")
 	rootCmd.AddCommand(receiveCmd)
 }

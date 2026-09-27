@@ -18,6 +18,7 @@ import (
 var (
 	sendTo    string
 	sendToken string
+	sendPin   string
 )
 
 var sendCmd = &cobra.Command{
@@ -62,9 +63,7 @@ var sendCmd = &cobra.Command{
 			return err
 		}
 		req.Header.Set("Content-Type", w.FormDataContentType())
-		if token != "" {
-			req.Header.Set("Authorization", "Bearer "+token)
-		}
+		setAuth(req, token, pinFor(sendPin))
 		start := time.Now()
 		prog := &transfer.Progress{Total: info.Size()}
 		resp, err := http.DefaultClient.Do(req)
@@ -131,5 +130,6 @@ func hashFile(path string) (string, error) {
 func init() {
 	sendCmd.Flags().StringVar(&sendTo, "to", "", "server address host:port")
 	sendCmd.Flags().StringVar(&sendToken, "token", "", "server token (or LANBOX_TOKEN)")
+	sendCmd.Flags().StringVar(&sendPin, "pin", "", "server PIN (or LANBOX_PIN)")
 	rootCmd.AddCommand(sendCmd)
 }
