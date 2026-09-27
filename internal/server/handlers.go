@@ -17,7 +17,9 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("download started", "path", r.URL.Query().Get("path"))
-	transfer.ServeFile(w, r, path)
+	if n, err := transfer.ServeFile(w, r, path); err != nil {
+		s.log.Warn("download cancelled", "path", r.URL.Query().Get("path"), "sent", n)
+	}
 }
 
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
@@ -28,6 +30,11 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	file, header, err := r.FormFile("file")
 	if err != nil {
+		if r.Context().Err() != nil {
+			s.log.Warn("upload cancelled", "error", r.Context().Err())
+			writeError(w, http.StatusBadRequest, "Transfer cancelled")
+			return
+		}
 		writeError(w, http.StatusBadRequest, "Missing file field")
 		return
 	}
