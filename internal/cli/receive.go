@@ -12,9 +12,10 @@ import (
 )
 
 var (
-	receiveFrom  string
-	receiveOut   string
-	receiveToken string
+	receiveFrom   string
+	receiveOut    string
+	receiveToken  string
+	receiveResume bool
 )
 
 var receiveCmd = &cobra.Command{
@@ -30,6 +31,16 @@ var receiveCmd = &cobra.Command{
 		if token == "" {
 			token = os.Getenv("LANBOX_TOKEN")
 		}
+		out := receiveOut
+		if out == "" || isDir(out) {
+			out = filepath.Join(out, filepath.Base(remote))
+		}
+		var offset int64
+		if receiveResume {
+			if info, err := os.Stat(out); err == nil && !info.IsDir() {
+				offset = info.Size()
+			}
+		}
 		url := fmt.Sprintf("http://%s/api/v1/files/download?path=%s", receiveFrom, remote)
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
@@ -38,32 +49,40 @@ var receiveCmd = &cobra.Command{
 		if token != "" {
 			req.Header.Set("Authorization", "Bearer "+token)
 		}
+		if offset > 0 {
+			req.Header.Set("Range", fmt.Sprintf("bytes=%d-", offset))
+			fmt.Printf("Resuming from %s...\n", humanBytes(offset))
+		}
 		start := time.Now()
 		resp, err := http.DefaultClient.Do(req)
 		if err != nil {
 			return fmt.Errorf("cannot connect — is lanbox serve running? %w", err)
 		}
 		defer resp.Body.Close()
-		if resp.StatusCode != http.StatusOK {
+		switch resp.StatusCode {
+		case http.StatusOK:
+			offset = 0 // server ignored Range or fresh start
+		case http.StatusPartialContent:
+		default:
 			body, _ := io.ReadAll(io.LimitReader(resp.Body, 256))
 			return fmt.Errorf("server returned %s: %s", resp.Status, string(body))
 		}
-		out := receiveOut
-		if out == "" || isDir(out) {
-			out = filepath.Join(out, filepath.Base(remote))
+		var f *os.File
+		if offset > 0 {
+			f, err = os.OpenFile(out, os.O_WRONLY|os.O_APPEND, 0o644)
+		} else {
+			f, err = os.Create(out)
 		}
-		f, err := os.Create(out)
 		if err != nil {
 			return err
 		}
 		n, err := io.Copy(f, resp.Body)
 		_ = f.Close()
 		if err != nil {
-			_ = os.Remove(out)
 			return err
 		}
 		el := time.Since(start).Seconds()
-		fmt.Printf("Received: %s (%.1f MB) in %.1fs\n", out, float64(n)/1024/1024, el)
+		fmt.Printf("Received: %s (%.1f MB) in %.1fs\n", out, float64(offset+n)/1024/1024, el)
 		return nil
 	},
 }
@@ -80,5 +99,6 @@ func init() {
 	receiveCmd.Flags().StringVar(&receiveFrom, "from", "", "server address host:port")
 	receiveCmd.Flags().StringVar(&receiveOut, "out", "", "output file or directory")
 	receiveCmd.Flags().StringVar(&receiveToken, "token", "", "server token (or LANBOX_TOKEN)")
+	receiveCmd.Flags().BoolVar(&receiveResume, "resume", false, "resume from existing partial file")
 	rootCmd.AddCommand(receiveCmd)
 }
