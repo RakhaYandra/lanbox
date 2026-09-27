@@ -11,8 +11,8 @@ import (
 func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/info", s.handleInfo)
 	s.mux.HandleFunc("GET /api/v1/files", s.handleList)
-	s.mux.HandleFunc("GET /api/v1/files/download", s.handleDownload)
-	s.mux.HandleFunc("POST /api/v1/files/upload", s.handleUpload)
+	s.mux.Handle("GET /api/v1/files/download", s.limitSlots(http.HandlerFunc(s.handleDownload)))
+	s.mux.Handle("POST /api/v1/files/upload", s.limitSlots(http.HandlerFunc(s.handleUpload)))
 	if s.webDir != "" {
 		s.mux.Handle("/", http.FileServer(http.Dir(s.webDir)))
 	}

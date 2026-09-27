@@ -19,11 +19,12 @@ type Server struct {
 	token  auth.Token
 	log    *slog.Logger
 	mux    *http.ServeMux
+	sem    chan struct{}
 }
 
 // New builds the server without starting it.
 func New(root, host string, port int, webDir string, token auth.Token, log *slog.Logger) *Server {
-	s := &Server{root: root, host: host, port: port, webDir: webDir, token: token, log: log, mux: http.NewServeMux()}
+	s := &Server{root: root, host: host, port: port, webDir: webDir, token: token, log: log, mux: http.NewServeMux(), sem: make(chan struct{}, 4)}
 	s.routes()
 	return s
 }

@@ -25,6 +25,22 @@ func (s *Server) requireToken(next http.Handler) http.Handler {
 	})
 }
 
+// transferSlots bounds concurrent uploads/downloads (ADR-006).
+// Excess requests get 429 + Retry-After instead of queuing unbounded.
+func (s *Server) limitSlots(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		select {
+		case s.sem <- struct{}{}:
+			defer func() { <-s.sem }()
+			next.ServeHTTP(w, r)
+		default:
+			s.log.Warn("server busy", "path", r.URL.Path)
+			w.Header().Set("Retry-After", "5")
+			writeError(w, http.StatusTooManyRequests, "Server busy — try again")
+		}
+	})
+}
+
 // logging records method, path (query stripped — never log tokens), status,
 // and duration.
 func (s *Server) logging(next http.Handler) http.Handler {
