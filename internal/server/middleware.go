@@ -2,16 +2,21 @@ package server
 
 import (
 	"net/http"
+	"strings"
 	"time"
 
 	"github.com/RakhaYandra/lanbox/internal/auth"
 )
 
-// requireToken gates every /api/* request. The static web UI ("/")
-// stays open so the login screen can load.
+// requireToken gates every /api/* request, except the public share
+// download (its share token IS the auth) and the static web UI ("/").
 func (s *Server) requireToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/shares/") {
 			next.ServeHTTP(w, r)
 			return
 		}
