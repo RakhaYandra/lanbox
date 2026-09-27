@@ -1,5 +1,11 @@
 package config
 
+import (
+	"os"
+	"path/filepath"
+	"strings"
+)
+
 // Config holds all server settings.
 // Precedence: CLI flags > LANBOX_* env > config file > defaults.
 type Config struct {
@@ -10,6 +16,18 @@ type Config struct {
 	WebOrigin  string
 	PinEnabled bool
 	LimitMbps  int
+}
+
+// ExpandDir resolves ~ and returns an absolute path.
+func ExpandDir(dir string) (string, error) {
+	if strings.HasPrefix(dir, "~/") {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", err
+		}
+		dir = filepath.Join(home, dir[2:])
+	}
+	return filepath.Abs(dir)
 }
 
 // Defaults returns the default configuration.

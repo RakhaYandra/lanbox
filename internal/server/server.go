@@ -1,0 +1,54 @@
+package server
+
+import (
+	"context"
+	"fmt"
+	"log/slog"
+	"net/http"
+	"time"
+)
+
+// Server wires routes to handlers.
+type Server struct {
+	root   string
+	host   string
+	port   int
+	webDir string
+	log    *slog.Logger
+	mux    *http.ServeMux
+}
+
+// New builds the server without starting it.
+func New(root, host string, port int, webDir string, log *slog.Logger) *Server {
+	s := &Server{root: root, host: host, port: port, webDir: webDir, log: log, mux: http.NewServeMux()}
+	s.routes()
+	return s
+}
+
+// Handler exposes the mux with logging middleware.
+func (s *Server) Handler() http.Handler {
+	return s.logging(s.mux)
+}
+
+// Addr returns host:port.
+func (s *Server) Addr() string {
+	return fmt.Sprintf("%s:%d", s.host, s.port)
+}
+
+// Run serves until ctx is cancelled, then drains up to 10s.
+func (s *Server) Run(ctx context.Context) error {
+	httpSrv := &http.Server{Addr: s.Addr(), Handler: s.Handler()}
+	go func() {
+		<-ctx.Done()
+		drain, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		_ = httpSrv.Shutdown(drain)
+	}()
+	s.log.Info("server started", "addr", s.Addr(), "dir", s.root)
+	err := httpSrv.ListenAndServe()
+	if err == http.ErrServerClosed {
+		s.log.Info("server stopped")
+		return nil
+	}
+	return err
+}
