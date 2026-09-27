@@ -33,12 +33,30 @@ var serveCmd = &cobra.Command{
 		if err != nil {
 			return fmt.Errorf("cannot generate token: %w", err)
 		}
+		pin, err := auth.NewPIN()
+		if err != nil {
+			return fmt.Errorf("cannot generate PIN: %w", err)
+		}
 		srv := server.New(root, serveCfg.Host, serveCfg.Port, serveCfg.WebDir, token, log)
-		fmt.Printf("Serving %s\nLocal: http://localhost:%d\nNetwork: http://%s:%d\n",
-			root, serveCfg.Port, discovery.LANIP(), serveCfg.Port)
+		lanIP := discovery.LANIP()
+		// Ruling: block-art "QR" is unscannable theater, so M2 prints the
+		// full URL instead. Scannable QR moves to M3 via a small lib.
+		fmt.Printf(`
+LANBox %s
+Serving: %s
+Local:   http://localhost:%d/?token=%s
+Network: http://%s:%d/?token=%s
+PIN:     %s
+Press Ctrl+C to stop.
+`, Version, root, serveCfg.Port, token, lanIP, serveCfg.Port, token, pin)
+		if err := writePID(fmt.Sprintf("%s:%d", lanIP, serveCfg.Port), root); err != nil {
+			log.Warn("cannot write PID file", "error", err)
+		}
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer stop()
-		return srv.Run(ctx)
+		err = srv.Run(ctx)
+		removePID()
+		return err
 	},
 }
 
