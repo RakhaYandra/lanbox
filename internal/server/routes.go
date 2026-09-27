@@ -13,6 +13,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /api/v1/files", s.handleList)
 	s.mux.Handle("GET /api/v1/files/download", s.limitSlots(http.HandlerFunc(s.handleDownload)))
 	s.mux.Handle("POST /api/v1/files/upload", s.limitSlots(http.HandlerFunc(s.handleUpload)))
+	s.mux.HandleFunc("GET /api/v1/files/checksum", s.handleChecksum)
 	if s.webDir != "" {
 		s.mux.Handle("/", http.FileServer(http.Dir(s.webDir)))
 	}

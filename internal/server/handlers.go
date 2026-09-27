@@ -56,7 +56,8 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	prog := &transfer.Progress{Total: header.Size}
-	written, err := io.Copy(out, prog.Reader(file))
+	hasher := transfer.NewHasher()
+	written, err := io.Copy(hasher.Writer(out), prog.Reader(file))
 	_ = out.Close()
 	if err != nil {
 		_ = os.Remove(dst)
@@ -64,6 +65,30 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Transfer cancelled")
 		return
 	}
-	s.log.Info("upload completed", "path", dst, "progress", prog.String())
-	writeJSON(w, http.StatusCreated, map[string]any{"name": name, "size": written})
+	sum := hasher.Sum()
+	s.log.Info("upload completed", "path", dst, "progress", prog.String(), "sha256", sum)
+	writeJSON(w, http.StatusCreated, map[string]any{"name": name, "size": written, "checksum": "sha256:" + sum})
+}
+
+func (s *Server) handleChecksum(w http.ResponseWriter, r *http.Request) {
+	path, err := filesystem.Resolve(s.root, r.URL.Query().Get("path"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid path")
+		return
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		writeError(w, http.StatusNotFound, "Not found")
+		return
+	}
+	defer f.Close()
+	hasher := transfer.NewHasher()
+	if _, err := io.Copy(io.Discard, hasher.Reader(f)); err != nil {
+		writeError(w, http.StatusNotFound, "Not found")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"path":   r.URL.Query().Get("path"),
+		"sha256": hasher.Sum(),
+	})
 }

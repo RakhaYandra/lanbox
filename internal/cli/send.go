@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"mime/multipart"
@@ -71,7 +72,12 @@ var sendCmd = &cobra.Command{
 			return fmt.Errorf("cannot connect — is lanbox serve running? %w", err)
 		}
 		defer resp.Body.Close()
-		_, _ = io.Copy(io.Discard, resp.Body)
+		var result struct {
+			Name     string `json:"name"`
+			Size     int64  `json:"size"`
+			Checksum string `json:"checksum"`
+		}
+		_ = json.NewDecoder(resp.Body).Decode(&result)
 		if resp.StatusCode != http.StatusCreated {
 			return fmt.Errorf("server returned %s", resp.Status)
 		}
@@ -80,6 +86,15 @@ var sendCmd = &cobra.Command{
 		speed := float64(info.Size()) / el / 1024 / 1024
 		fmt.Printf("%s\n%s\nTransferred: %s\nTime: %.1fs\nSpeed: %.1f MB/s\n",
 			filepath.Base(local), prog.String(), humanBytes(info.Size()), el, speed)
+		localSum, err := hashFile(local)
+		if err != nil {
+			return err
+		}
+		if result.Checksum != "" && result.Checksum == "sha256:"+localSum {
+			fmt.Printf("Checksum: sha256:%s\nVerified\n", localSum)
+		} else {
+			return fmt.Errorf("checksum mismatch: local sha256:%s server %s", localSum, result.Checksum)
+		}
 		return nil
 	},
 }
@@ -97,6 +112,20 @@ func humanBytes(n int64) string {
 		}
 	}
 	return fmt.Sprintf("%.1f GB", v)
+}
+
+// hashFile streams a local file through SHA-256.
+func hashFile(path string) (string, error) {
+	f, err := os.Open(path)
+	if err != nil {
+		return "", err
+	}
+	defer f.Close()
+	h := transfer.NewHasher()
+	if _, err := io.Copy(io.Discard, h.Reader(f)); err != nil {
+		return "", err
+	}
+	return h.Sum(), nil
 }
 
 func init() {

@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
@@ -83,8 +84,38 @@ var receiveCmd = &cobra.Command{
 		}
 		el := time.Since(start).Seconds()
 		fmt.Printf("Received: %s (%.1f MB) in %.1fs\n", out, float64(offset+n)/1024/1024, el)
-		return nil
+		return verifyDownload(receiveFrom, token, remote, out)
 	},
+}
+
+// verifyDownload compares the local file hash against the server checksum.
+func verifyDownload(host, token, remote, local string) error {
+	url := fmt.Sprintf("http://%s/api/v1/files/checksum?path=%s", host, remote)
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+	if token != "" {
+		req.Header.Set("Authorization", "Bearer "+token)
+	}
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+	var result struct {
+		SHA256 string `json:"sha256"`
+	}
+	_ = json.NewDecoder(resp.Body).Decode(&result)
+	localSum, err := hashFile(local)
+	if err != nil {
+		return err
+	}
+	if result.SHA256 != "" && result.SHA256 == localSum {
+		fmt.Printf("Checksum: sha256:%s\nVerified\n", localSum)
+		return nil
+	}
+	return fmt.Errorf("checksum mismatch: local sha256:%s server sha256:%s", localSum, result.SHA256)
 }
 
 func isDir(p string) bool {
