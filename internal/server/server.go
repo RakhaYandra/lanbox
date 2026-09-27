@@ -6,6 +6,8 @@ import (
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/RakhaYandra/lanbox/internal/auth"
 )
 
 // Server wires routes to handlers.
@@ -14,20 +16,21 @@ type Server struct {
 	host   string
 	port   int
 	webDir string
+	token  auth.Token
 	log    *slog.Logger
 	mux    *http.ServeMux
 }
 
 // New builds the server without starting it.
-func New(root, host string, port int, webDir string, log *slog.Logger) *Server {
-	s := &Server{root: root, host: host, port: port, webDir: webDir, log: log, mux: http.NewServeMux()}
+func New(root, host string, port int, webDir string, token auth.Token, log *slog.Logger) *Server {
+	s := &Server{root: root, host: host, port: port, webDir: webDir, token: token, log: log, mux: http.NewServeMux()}
 	s.routes()
 	return s
 }
 
-// Handler exposes the mux with logging middleware.
+// Handler exposes the mux with logging + auth middleware.
 func (s *Server) Handler() http.Handler {
-	return s.logging(s.mux)
+	return s.logging(s.requireToken(s.mux))
 }
 
 // Addr returns host:port.

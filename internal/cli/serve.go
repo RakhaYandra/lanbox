@@ -9,6 +9,7 @@ import (
 
 	"github.com/spf13/cobra"
 
+	"github.com/RakhaYandra/lanbox/internal/auth"
 	"github.com/RakhaYandra/lanbox/internal/config"
 	"github.com/RakhaYandra/lanbox/internal/discovery"
 	"github.com/RakhaYandra/lanbox/internal/server"
@@ -28,7 +29,11 @@ var serveCmd = &cobra.Command{
 			return fmt.Errorf("cannot access %s: %w", root, err)
 		}
 		log := slog.New(slog.NewTextHandler(os.Stdout, nil))
-		srv := server.New(root, serveCfg.Host, serveCfg.Port, serveCfg.WebDir, log)
+		token, err := auth.NewToken()
+		if err != nil {
+			return fmt.Errorf("cannot generate token: %w", err)
+		}
+		srv := server.New(root, serveCfg.Host, serveCfg.Port, serveCfg.WebDir, token, log)
 		fmt.Printf("Serving %s\nLocal: http://localhost:%d\nNetwork: http://%s:%d\n",
 			root, serveCfg.Port, discovery.LANIP(), serveCfg.Port)
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)

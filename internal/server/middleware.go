@@ -3,7 +3,27 @@ package server
 import (
 	"net/http"
 	"time"
+
+	"github.com/RakhaYandra/lanbox/internal/auth"
 )
+
+// requireToken gates every /api/* request. The static web UI ("/")
+// stays open so the login screen can load.
+func (s *Server) requireToken(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+			next.ServeHTTP(w, r)
+			return
+		}
+		got := auth.Bearer(r.URL.Query().Get("token"), r.Header.Get("Authorization"))
+		if !s.token.Check(got) {
+			s.log.Warn("unauthorized", "path", r.URL.Path)
+			writeError(w, http.StatusUnauthorized, "Unauthorized — wrong token")
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
 
 // logging records method, path (query stripped — never log tokens), status,
 // and duration.
