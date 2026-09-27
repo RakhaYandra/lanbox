@@ -19,6 +19,8 @@ import (
 
 var serveLimit string
 
+var servePin string
+
 var serveCfg config.Config
 
 var serveCmd = &cobra.Command{
@@ -42,6 +44,18 @@ var serveCmd = &cobra.Command{
 			return fmt.Errorf("cannot generate PIN: %w", err)
 		}
 		srv := server.New(root, serveCfg.Host, serveCfg.Port, serveCfg.WebDir, token, log)
+		pinLabel := pin
+		if servePin == "off" {
+			pin = ""
+			pinLabel = "off"
+		} else if servePin != "" {
+			if len(servePin) != 6 {
+				return fmt.Errorf("invalid --pin %q (want 6 digits or off)", servePin)
+			}
+			pin = servePin
+			pinLabel = pin
+		}
+		srv.SetPIN(pin)
 		if serveLimit != "" {
 			bps, err := parseLimit(serveLimit)
 			if err != nil {
@@ -59,7 +73,7 @@ Local:   http://localhost:%d/?token=%s
 Network: http://%s:%d/?token=%s
 PIN:     %s
 Press Ctrl+C to stop.
-`, Version, root, serveCfg.Port, token, lanIP, serveCfg.Port, token, pin)
+`, Version, root, serveCfg.Port, token, lanIP, serveCfg.Port, token, pinLabel)
 		if qrErr == nil {
 			fmt.Println("Scan QR to connect:")
 			fmt.Println(qr)
@@ -84,6 +98,7 @@ func init() {
 	serveCmd.Flags().StringVar(&serveCfg.Host, "host", defs.Host, "address to bind")
 	serveCmd.Flags().StringVar(&serveCfg.WebDir, "web-dir", defs.WebDir, "directory with lanbox-web build output")
 	serveCmd.Flags().StringVar(&serveLimit, "limit", "", "cap throughput, e.g. 20MB/s (0 = unlimited)")
+	serveCmd.Flags().StringVar(&servePin, "pin", "", "6-digit PIN (default: generated; \"off\" disables PIN check)")
 }
 
 // parseLimit accepts "20", "20M", "20MB/s" (megabytes/sec) into bytes/sec.

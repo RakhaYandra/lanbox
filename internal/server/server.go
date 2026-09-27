@@ -17,6 +17,7 @@ type Server struct {
 	port   int
 	webDir string
 	token  auth.Token
+	pin    string // empty = PIN check disabled (--pin off)
 	log    *slog.Logger
 	mux    *http.ServeMux
 	sem    chan struct{}
@@ -34,6 +35,11 @@ func New(root, host string, port int, webDir string, token auth.Token, log *slog
 // SetLimit caps transfer throughput in bytes/sec (0 = unlimited).
 func (s *Server) SetLimit(bps int64) {
 	s.limit = bps
+}
+
+// SetPIN enables the PIN check (empty disables it).
+func (s *Server) SetPIN(pin string) {
+	s.pin = pin
 }
 
 // Handler exposes the mux with logging + auth middleware.

@@ -1,6 +1,7 @@
 package server
 
 import (
+	"crypto/subtle"
 	"net/http"
 	"strings"
 	"time"
@@ -25,6 +26,17 @@ func (s *Server) requireToken(next http.Handler) http.Handler {
 			s.log.Warn("unauthorized", "path", r.URL.Path)
 			writeError(w, http.StatusUnauthorized, "Unauthorized — wrong token")
 			return
+		}
+		if s.pin != "" {
+			pin := r.Header.Get("X-PIN")
+			if pin == "" {
+				pin = r.URL.Query().Get("pin")
+			}
+			if subtle.ConstantTimeCompare([]byte(pin), []byte(s.pin)) != 1 {
+				s.log.Warn("wrong PIN", "path", r.URL.Path)
+				writeError(w, http.StatusUnauthorized, "Unauthorized — wrong PIN")
+				return
+			}
 		}
 		next.ServeHTTP(w, r)
 	})
