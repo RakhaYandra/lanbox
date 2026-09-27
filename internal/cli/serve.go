@@ -50,8 +50,8 @@ var serveCmd = &cobra.Command{
 			srv.SetLimit(bps)
 		}
 		lanIP := discovery.LANIP()
-		// Ruling: block-art "QR" is unscannable theater, so M2 prints the
-		// full URL instead. Scannable QR moves to M3 via a small lib.
+		netURL := fmt.Sprintf("http://%s:%d/?token=%s", lanIP, serveCfg.Port, token)
+		qr, qrErr := discovery.QR(netURL)
 		fmt.Printf(`
 LANBox %s
 Serving: %s
@@ -60,6 +60,12 @@ Network: http://%s:%d/?token=%s
 PIN:     %s
 Press Ctrl+C to stop.
 `, Version, root, serveCfg.Port, token, lanIP, serveCfg.Port, token, pin)
+		if qrErr == nil {
+			fmt.Println("Scan QR to connect:")
+			fmt.Println(qr)
+		} else {
+			fmt.Printf("Open: %s\n", netURL)
+		}
 		if err := writePID(fmt.Sprintf("%s:%d", lanIP, serveCfg.Port), root); err != nil {
 			log.Warn("cannot write PID file", "error", err)
 		}

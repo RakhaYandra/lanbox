@@ -31,3 +31,17 @@ make test
 
 Docs (requirements, architecture, guides + PDFs): `lanbox-docs` repo.
 Web UI source: `lanbox-web` repo.
+
+## Benchmark (loopback, legion5, 2026-09-27)
+
+| Case | Result |
+|---|---|
+| 1 GB upload | 2.4s (~440 MB/s), server RSS ~140 MB |
+| CLI send 100 MB | ~434 MB/s + `Verified` |
+| 2 / 4 parallel uploads | 2×201 / 4×201 |
+| 8 parallel uploads | 4×201 + 4×429 (semaphore working) |
+| 8×20 MB parallel RSS | ~390 MB (multipart buffers, bounded) |
+| `--limit 5MB/s` | measured ~5.5 MB/s (±10%) |
+
+Memory stays flat versus file size; concurrency bounded by the 4-slot
+semaphore. Rerun: `./test/security.sh` and `./test/load.sh` (see IMPLEMENTATION §6).
