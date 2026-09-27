@@ -21,6 +21,7 @@ type Server struct {
 	mux    *http.ServeMux
 	sem    chan struct{}
 	shares *ShareStore
+	limit  int64 // bytes/sec, 0 = unlimited
 }
 
 // New builds the server without starting it.
@@ -28,6 +29,11 @@ func New(root, host string, port int, webDir string, token auth.Token, log *slog
 	s := &Server{root: root, host: host, port: port, webDir: webDir, token: token, log: log, mux: http.NewServeMux(), sem: make(chan struct{}, 4), shares: NewShareStore()}
 	s.routes()
 	return s
+}
+
+// SetLimit caps transfer throughput in bytes/sec (0 = unlimited).
+func (s *Server) SetLimit(bps int64) {
+	s.limit = bps
 }
 
 // Handler exposes the mux with logging + auth middleware.

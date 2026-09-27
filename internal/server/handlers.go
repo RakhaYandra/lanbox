@@ -17,7 +17,7 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	s.log.Info("download started", "path", r.URL.Query().Get("path"))
-	if n, err := transfer.ServeFile(w, r, path); err != nil {
+	if n, err := transfer.ServeFileLimit(w, r, path, s.limit); err != nil {
 		s.log.Warn("download cancelled", "path", r.URL.Query().Get("path"), "sent", n)
 	}
 }

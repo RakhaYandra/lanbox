@@ -146,7 +146,7 @@ func (s *Server) handleShareGet(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusNotFound, "Share expired or not found")
 		return
 	}
-	if _, err := transfer.ServeFile(w, r, sh.Path); err != nil {
+	if _, err := transfer.ServeFileLimit(w, r, sh.Path, s.limit); err != nil {
 		s.log.Warn("share download cancelled", "token", sh.Token)
 	}
 }
