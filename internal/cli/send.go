@@ -57,7 +57,7 @@ var sendCmd = &cobra.Command{
 			_ = pw.CloseWithError(err)
 		}()
 
-		url := fmt.Sprintf("http://%s/api/v1/files/upload?path=/", sendTo)
+		url := apiURL(sendTo, "/api/v1/files/upload?path=/")
 		req, err := http.NewRequest("POST", url, pr)
 		if err != nil {
 			return err
@@ -66,7 +66,7 @@ var sendCmd = &cobra.Command{
 		setAuth(req, token, pinFor(sendPin))
 		start := time.Now()
 		prog := &transfer.Progress{Total: info.Size()}
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := tlsClient.Do(req)
 		if err != nil {
 			return fmt.Errorf("cannot connect — is lanbox serve running? %w", err)
 		}

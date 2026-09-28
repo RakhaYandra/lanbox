@@ -87,16 +87,24 @@ var serveCmd = &cobra.Command{
 			srv.SetLimit(bps)
 		}
 		lanIP := discovery.LANIP()
-		netURL := fmt.Sprintf("http://%s:%d/?token=%s", lanIP, serveCfg.Port, token)
+		tlsCert, err := server.NewTLSCert(lanIP)
+		if err != nil {
+			return fmt.Errorf("cannot generate TLS cert: %w", err)
+		}
+		srv.SetTLSCert(tlsCert)
+		netURL := fmt.Sprintf("https://%s:%d/?token=%s", lanIP, serveCfg.Port, token)
 		qr, qrErr := discovery.QR(netURL)
 		fmt.Printf(`
 LANBox %s
 Serving: %s
-Local:   http://localhost:%d/?token=%s
-Network: http://%s:%d/?token=%s
+Local:   https://localhost:%d/?token=%s
+Network: %s
 PIN:     %s
+TLS fingerprint:
+%s
+Verify the fingerprint on first connect; it changes on every restart.
 Press Ctrl+C to stop.
-`, Version, root, serveCfg.Port, token, lanIP, serveCfg.Port, token, pinLabel)
+`, Version, root, serveCfg.Port, token, netURL, pinLabel, tlsCert.Fingerprint())
 		if qrErr == nil {
 			fmt.Println("Scan QR to connect:")
 			fmt.Println(qr)

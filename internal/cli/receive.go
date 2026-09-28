@@ -43,7 +43,7 @@ var receiveCmd = &cobra.Command{
 				offset = info.Size()
 			}
 		}
-		url := fmt.Sprintf("http://%s/api/v1/files/download?path=%s", receiveFrom, remote)
+		url := apiURL(receiveFrom, "/api/v1/files/download?path="+remote)
 		req, err := http.NewRequest("GET", url, nil)
 		if err != nil {
 			return err
@@ -59,7 +59,7 @@ var receiveCmd = &cobra.Command{
 			fmt.Printf("Resuming from %s...\n", humanBytes(offset))
 		}
 		start := time.Now()
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := tlsClient.Do(req)
 		if err != nil {
 			return fmt.Errorf("cannot connect — is lanbox serve running? %w", err)
 		}
@@ -94,13 +94,13 @@ var receiveCmd = &cobra.Command{
 
 // verifyDownload compares the local file hash against the server checksum.
 func verifyDownload(host, token, remote, local string) error {
-	url := fmt.Sprintf("http://%s/api/v1/files/checksum?path=%s", host, remote)
+	url := apiURL(host, "/api/v1/files/checksum?path="+remote)
 	req, err := http.NewRequest("GET", url, nil)
 	if err != nil {
 		return err
 	}
 	setAuth(req, token, pinFor(receivePin))
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := tlsClient.Do(req)
 	if err != nil {
 		return err
 	}

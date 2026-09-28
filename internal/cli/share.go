@@ -41,13 +41,13 @@ var shareCmd = &cobra.Command{
 			"expires_minutes": int(dur.Minutes()),
 			"pin_required":    shareNeedPIN,
 		})
-		req, err := http.NewRequest("POST", fmt.Sprintf("http://%s/api/v1/shares", shareFrom), bytes.NewReader(body))
+		req, err := http.NewRequest("POST", apiURL(shareFrom, "/api/v1/shares"), bytes.NewReader(body))
 		if err != nil {
 			return err
 		}
 		req.Header.Set("Content-Type", "application/json")
 		setAuth(req, token, pinFor(sharePin))
-		resp, err := http.DefaultClient.Do(req)
+		resp, err := tlsClient.Do(req)
 		if err != nil {
 			return fmt.Errorf("cannot connect — is lanbox serve running? %w", err)
 		}
