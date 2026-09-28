@@ -6,9 +6,23 @@ token + PIN auth, no cloud, no account, no internet.
 
 ## Install
 
+Prebuilt binaries + web UI per release:
+[lanbox releases](https://github.com/RakhaYandra/lanbox/releases/latest)
+— pick your OS/arch tarball plus `lanbox-web-dist.zip`, then:
+
+```sh
+tar -xzf lanbox_*_linux_amd64.tar.gz
+unzip -d web lanbox-web-dist.zip
+./lanbox serve --dir ~/LANBox --web-dir ./web
+```
+
+From source:
+
 ```sh
 make build        # -> bin/lanbox (GOOS=linux|darwin|windows)
 ```
+
+Snapshot (6 binaries, no publish): `goreleaser --snapshot --clean`.
 
 ## Usage
 
@@ -19,7 +33,7 @@ bin/lanbox serve --dir ~/LANBox --port 8080
 # Terminal 2: serve the web UI build (from lanbox-web repo)
 bin/lanbox serve --dir ~/LANBox --web-dir ../lanbox-web/dist
 
-# Browser: http://<lan-ip>:8080  |  API: /api/v1/info, /files, /files/download, /files/upload
+# Browser: https://<lan-ip>:8080 (accept the self-signed warning once, check the fingerprint) | API: /api/v1/info, /files, /files/download, /files/upload
 bin/lanbox version
 ```
 

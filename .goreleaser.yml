@@ -1,0 +1,26 @@
+# GoReleaser v2: 6 binaries (3 OS x 2 arch) + checksums.
+# Web dist.zip is uploaded by .github/workflows/release.yml (separate repo).
+version: 2
+builds:
+  - id: lanbox
+    main: ./cmd/lanbox
+    binary: lanbox
+    goos: [linux, darwin, windows]
+    goarch: [amd64, arm64]
+    ldflags:
+      - -s -w -X github.com/RakhaYandra/lanbox/internal/cli.Version={{.Version}}
+archives:
+  - id: bins
+    builds: [lanbox]
+    formats: [tar.gz]
+    # Windows gets zip instead of tar.gz.
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+checksum:
+  name_template: 'checksums.txt'
+changelog:
+  sort: asc
+  use: github
+release:
+  draft: false
