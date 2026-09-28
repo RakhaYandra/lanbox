@@ -1,6 +1,8 @@
 # LANBox
 
-Local-first file sharing over the LAN. No cloud, no account, no internet.
+Local-first file sharing over the LAN. HTTPS always on (per-boot
+self-signed cert — verify the console fingerprint on first connect),
+token + PIN auth, no cloud, no account, no internet.
 
 ## Install
 
