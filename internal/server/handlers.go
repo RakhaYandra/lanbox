@@ -57,7 +57,7 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	prog := &transfer.Progress{Total: header.Size}
 	hasher := transfer.NewHasher()
-	written, err := io.Copy(hasher.Writer(out), prog.Reader(file))
+	written, err := io.Copy(hasher.Writer(out), prog.Reader(transfer.Throttle(file, s.limit)))
 	_ = out.Close()
 	if err != nil {
 		_ = os.Remove(dst)

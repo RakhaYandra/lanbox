@@ -8,11 +8,13 @@ import (
 )
 
 // Throttle wraps r so reads proceed at most bytesPerSec (0 = unlimited).
+// Burst is one 64 KB chunk: the cap holds from the first byte instead of
+// granting a full second of free burst.
 func Throttle(r io.Reader, bytesPerSec int64) io.Reader {
 	if bytesPerSec <= 0 {
 		return r
 	}
-	return &throttled{src: r, lim: rate.NewLimiter(rate.Limit(bytesPerSec), int(bytesPerSec))}
+	return &throttled{src: r, lim: rate.NewLimiter(rate.Limit(bytesPerSec), 64*1024)}
 }
 
 type throttled struct {
