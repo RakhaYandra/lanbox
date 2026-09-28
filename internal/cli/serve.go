@@ -116,6 +116,12 @@ Press Ctrl+C to stop.
 		}
 		ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt)
 		defer stop()
+		instance := discovery.InstanceName(serveCfg.Port)
+		if err := discovery.Advertise(ctx, instance, serveCfg.Port); err != nil {
+			log.Warn("mDNS advertise failed (discovery off)", "error", err)
+		} else {
+			fmt.Printf("mDNS: %s.local (port %d)\n", instance, serveCfg.Port)
+		}
 		err = srv.Run(ctx)
 		removePID()
 		return err
