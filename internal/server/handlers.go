@@ -92,3 +92,22 @@ func (s *Server) handleChecksum(w http.ResponseWriter, r *http.Request) {
 		"sha256": hasher.Sum(),
 	})
 }
+
+func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
+	path, err := filesystem.Resolve(s.root, r.URL.Query().Get("path"))
+	if err != nil {
+		writeError(w, http.StatusBadRequest, "Invalid path")
+		return
+	}
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		writeError(w, http.StatusNotFound, "Not found")
+		return
+	}
+	if err := os.Remove(path); err != nil {
+		writeError(w, http.StatusNotFound, "Not found")
+		return
+	}
+	s.log.Info("deleted", "path", r.URL.Query().Get("path"))
+	writeJSON(w, http.StatusOK, map[string]any{"deleted": r.URL.Query().Get("path")})
+}
