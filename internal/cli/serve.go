@@ -27,6 +27,29 @@ var serveCmd = &cobra.Command{
 	Use:   "serve",
 	Short: "Start the file-sharing server",
 	RunE: func(cmd *cobra.Command, args []string) error {
+		// Precedence: flags (Changed) > LANBOX_* env > config file > defaults.
+		base, err := config.Load()
+		if err != nil {
+			return err
+		}
+		flag := func(name, val, fallback string) string {
+			if cmd.Flags().Changed(name) {
+				return val
+			}
+			return fallback
+		}
+		if !cmd.Flags().Changed("port") {
+			serveCfg.Port = base.Port
+		}
+		serveCfg.Dir = flag("dir", serveCfg.Dir, base.Dir)
+		serveCfg.Host = flag("host", serveCfg.Host, base.Host)
+		serveCfg.WebDir = flag("web-dir", serveCfg.WebDir, base.WebDir)
+		if !cmd.Flags().Changed("pin") && !base.PinEnabled {
+			servePin = "off"
+		}
+		if !cmd.Flags().Changed("limit") && base.LimitMbps > 0 {
+			serveLimit = fmt.Sprintf("%dMB/s", base.LimitMbps)
+		}
 		root, err := config.ExpandDir(serveCfg.Dir)
 		if err != nil {
 			return err
