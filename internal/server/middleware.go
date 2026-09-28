@@ -9,11 +9,12 @@ import (
 	"github.com/RakhaYandra/lanbox/internal/auth"
 )
 
-// requireToken gates every /api/* request, except the public share
-// download (its share token IS the auth) and the static web UI ("/").
+// requireToken gates /api/* requests. Static web assets stay open so the
+// app (including its login screen) can load; data stays behind auth.
+// The public share download carries its own share-token auth.
 func (s *Server) requireToken(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+		if !strings.HasPrefix(r.URL.Path, "/api/") {
 			next.ServeHTTP(w, r)
 			return
 		}
