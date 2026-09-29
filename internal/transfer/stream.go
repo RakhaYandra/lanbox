@@ -3,8 +3,10 @@ package transfer
 import (
 	"fmt"
 	"io"
+	"mime"
 	"net/http"
 	"os"
+	"path/filepath"
 	"strconv"
 )
 
@@ -50,4 +52,57 @@ func ServeFileLimit(w http.ResponseWriter, r *http.Request, path string, bps int
 	}
 	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
 	return io.Copy(w, Throttle(f, bps))
+}
+
+// MaxPreviewBytes caps inline previews; larger files must download.
+const MaxPreviewBytes = 20 * 1024 * 1024
+
+// ServePreview streams a file for inline browser display (images, text,
+// PDF). Only safe types are inlined; anything else falls back to download.
+// Files over the cap get 413.
+func ServePreview(w http.ResponseWriter, r *http.Request, path string) error {
+	f, err := os.Open(path)
+	if err != nil {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return err
+	}
+	defer f.Close()
+	info, err := f.Stat()
+	if err != nil || info.IsDir() {
+		http.Error(w, "Not found", http.StatusNotFound)
+		return fmt.Errorf("not a file")
+	}
+	if info.Size() > MaxPreviewBytes {
+		http.Error(w, "Too large to preview", http.StatusRequestEntityTooLarge)
+		return fmt.Errorf("too large")
+	}
+	ctype := mime.TypeByExtension(filepath.Ext(path))
+	if ctype == "" {
+		var head [512]byte
+		n, _ := f.Read(head[:])
+		ctype = http.DetectContentType(head[:n])
+		if _, err := f.Seek(0, io.SeekStart); err != nil {
+			http.Error(w, "Not found", http.StatusNotFound)
+			return err
+		}
+	}
+	if !previewable(ctype) {
+		w.Header().Set("Content-Disposition", fmt.Sprintf("attachment; filename=%q", filepath.Base(path)))
+	} else {
+		w.Header().Set("Content-Disposition", fmt.Sprintf("inline; filename=%q", filepath.Base(path)))
+	}
+	w.Header().Set("Content-Type", ctype)
+	w.Header().Set("Content-Length", strconv.FormatInt(info.Size(), 10))
+	_, err = io.Copy(w, f)
+	return err
+}
+
+// previewable allowlists types safe to render inline.
+func previewable(ctype string) bool {
+	for _, p := range []string{"image/", "text/plain", "text/markdown", "application/pdf", "application/json"} {
+		if len(ctype) >= len(p) && ctype[:len(p)] == p {
+			return true
+		}
+	}
+	return false
 }
