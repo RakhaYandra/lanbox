@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/RakhaYandra/lanbox/internal/filesystem"
 )
@@ -43,6 +44,20 @@ func (s *Server) handleInfo(w http.ResponseWriter, r *http.Request) {
 }
 
 func (s *Server) handleList(w http.ResponseWriter, r *http.Request) {
+	if s.dropFile != "" {
+		info, err := os.Stat(s.dropFile)
+		if err != nil {
+			writeError(w, http.StatusNotFound, "Not found")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{
+			"path": "/",
+			"entries": []filesystem.Entry{
+				{Name: filepath.Base(s.dropFile), Type: "file", Size: info.Size()},
+			},
+		})
+		return
+	}
 	dir, err := filesystem.Resolve(s.root, r.URL.Query().Get("path"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid path")

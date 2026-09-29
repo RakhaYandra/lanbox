@@ -13,18 +13,21 @@ import (
 
 // Server wires routes to handlers.
 type Server struct {
-	root    string
-	host    string
-	port    int
-	webDir  string
-	token   auth.Token
-	pin     string // empty = PIN check disabled (--pin off)
-	log     *slog.Logger
-	mux     *http.ServeMux
-	sem     chan struct{}
-	shares  *ShareStore
-	limit   int64 // bytes/sec, 0 = unlimited
-	tlsCert *TLSCert
+	root     string
+	host     string
+	port     int
+	webDir   string
+	token    auth.Token
+	pin      string // empty = PIN check disabled (--pin off)
+	log      *slog.Logger
+	mux      *http.ServeMux
+	sem      chan struct{}
+	shares   *ShareStore
+	limit    int64 // bytes/sec, 0 = unlimited
+	tlsCert  *TLSCert
+	dropFile string // resolved single-file path, "" = off
+	dropLeft int32
+	shutdown func(context.Context) error
 }
 
 // New builds the server without starting it.
@@ -73,6 +76,7 @@ func (s *Server) Run(ctx context.Context) error {
 			MinVersion:   tls.VersionTLS12,
 		},
 	}
+	s.shutdown = httpSrv.Shutdown
 	go func() {
 		<-ctx.Done()
 		drain, cancel := context.WithTimeout(context.Background(), 10*time.Second)

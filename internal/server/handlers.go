@@ -16,6 +16,10 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Invalid path")
 		return
 	}
+	if s.dropFile != "" && path != s.dropFile {
+		writeError(w, http.StatusNotFound, "Not found")
+		return
+	}
 	s.log.Info("download started", "path", r.URL.Query().Get("path"))
 	if r.URL.Query().Get("preview") == "1" {
 		if err := transfer.ServePreview(w, r, path); err != nil {
@@ -25,10 +29,16 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 	}
 	if n, err := transfer.ServeFileLimit(w, r, path, s.limit); err != nil {
 		s.log.Warn("download cancelled", "path", r.URL.Query().Get("path"), "sent", n)
+	} else {
+		s.countDrop()
 	}
 }
 
 func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
+	if s.dropFile != "" {
+		writeError(w, http.StatusForbidden, "Drop mode serves one file")
+		return
+	}
 	dir, err := filesystem.Resolve(s.root, r.URL.Query().Get("path"))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "Invalid path")

@@ -6,6 +6,7 @@ import (
 	"log/slog"
 	"os"
 	"os/signal"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -20,6 +21,10 @@ import (
 var serveLimit string
 
 var servePin string
+
+var serveDrop string
+
+var serveDropCount int
 
 var serveCfg config.Config
 
@@ -57,6 +62,22 @@ var serveCmd = &cobra.Command{
 		if err := os.MkdirAll(root, 0o755); err != nil {
 			return fmt.Errorf("cannot access %s: %w", root, err)
 		}
+		dropFile := ""
+		if serveDrop != "" {
+			abs, err := filepath.Abs(serveDrop)
+			if err != nil {
+				return fmt.Errorf("bad --drop path: %w", err)
+			}
+			info, err := os.Stat(abs)
+			if err != nil || info.IsDir() {
+				return fmt.Errorf("not a file: %s", serveDrop)
+			}
+			if serveDropCount < 1 {
+				return fmt.Errorf("invalid --drop-count %d (want >= 1)", serveDropCount)
+			}
+			root = filepath.Dir(abs)
+			dropFile = abs
+		}
 		log := slog.New(slog.NewTextHandler(os.Stdout, nil))
 		token, err := auth.NewToken()
 		if err != nil {
@@ -79,6 +100,9 @@ var serveCmd = &cobra.Command{
 			pinLabel = pin
 		}
 		srv.SetPIN(pin)
+		if dropFile != "" {
+			srv.SetDrop(dropFile, serveDropCount)
+		}
 		if serveLimit != "" {
 			bps, err := parseLimit(serveLimit)
 			if err != nil {
@@ -136,6 +160,8 @@ func init() {
 	serveCmd.Flags().StringVar(&serveCfg.WebDir, "web-dir", defs.WebDir, "directory with lanbox-web build output")
 	serveCmd.Flags().StringVar(&serveLimit, "limit", "", "cap throughput, e.g. 20MB/s (0 = unlimited)")
 	serveCmd.Flags().StringVar(&servePin, "pin", "", "6-digit PIN (default: generated; \"off\" disables PIN check)")
+	serveCmd.Flags().StringVar(&serveDrop, "drop", "", "serve one file, exit after --drop-count downloads")
+	serveCmd.Flags().IntVar(&serveDropCount, "drop-count", 1, "completed downloads before drop mode exits")
 }
 
 // parseLimit accepts "20", "20M", "20MB/s" (megabytes/sec) into bytes/sec.
