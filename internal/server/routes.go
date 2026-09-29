@@ -21,6 +21,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("DELETE /api/v1/files", s.handleDelete)
 	s.mux.HandleFunc("GET /api/v1/transfers", s.handleTransfers)
 	s.mux.HandleFunc("DELETE /api/v1/transfers/{id}", s.handleTransferCancel)
+	s.mux.HandleFunc("GET /api/v1/history", s.handleHistory)
 	if s.webDir != "" {
 		s.mux.Handle("/", http.FileServer(http.Dir(s.webDir)))
 	}

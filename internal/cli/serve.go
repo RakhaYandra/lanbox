@@ -15,6 +15,7 @@ import (
 	"github.com/RakhaYandra/lanbox/internal/auth"
 	"github.com/RakhaYandra/lanbox/internal/config"
 	"github.com/RakhaYandra/lanbox/internal/discovery"
+	"github.com/RakhaYandra/lanbox/internal/history"
 	"github.com/RakhaYandra/lanbox/internal/server"
 )
 
@@ -100,6 +101,14 @@ var serveCmd = &cobra.Command{
 			pinLabel = pin
 		}
 		srv.SetPIN(pin)
+		if histPath, err := history.DefaultPath(); err != nil {
+			log.Warn("history disabled", "error", err)
+		} else if histDB, err := history.Open(histPath); err != nil {
+			log.Warn("history disabled", "error", err)
+		} else {
+			defer histDB.Close()
+			srv.SetHistory(histDB)
+		}
 		if dropFile != "" {
 			srv.SetDrop(dropFile, serveDropCount)
 		}

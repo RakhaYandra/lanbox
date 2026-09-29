@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/RakhaYandra/lanbox/internal/auth"
+	"github.com/RakhaYandra/lanbox/internal/history"
 	"github.com/RakhaYandra/lanbox/internal/transfer"
 )
 
@@ -30,6 +31,7 @@ type Server struct {
 	dropLeft int32
 	shutdown func(context.Context) error
 	reg      *transfer.Registry
+	hist     *history.DB // nil = history disabled (best effort)
 }
 
 // New builds the server without starting it.
@@ -37,6 +39,11 @@ func New(root, host string, port int, webDir string, token auth.Token, log *slog
 	s := &Server{root: root, host: host, port: port, webDir: webDir, token: token, log: log, mux: http.NewServeMux(), sem: make(chan struct{}, 4), shares: NewShareStore(), reg: transfer.NewRegistry()}
 	s.routes()
 	return s
+}
+
+// SetHistory attaches the persistent transfer log (nil disables it).
+func (s *Server) SetHistory(db *history.DB) {
+	s.hist = db
 }
 
 // SetLimit caps transfer throughput in bytes/sec (0 = unlimited).

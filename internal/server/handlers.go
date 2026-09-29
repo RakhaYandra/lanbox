@@ -5,8 +5,11 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"strconv"
+	"time"
 
 	"github.com/RakhaYandra/lanbox/internal/filesystem"
+	"github.com/RakhaYandra/lanbox/internal/history"
 	"github.com/RakhaYandra/lanbox/internal/transfer"
 )
 
@@ -28,12 +31,25 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	t := s.reg.Start(r.Context(), filepath.Base(path), fileSize(path))
+	start := time.Now()
 	n, err := transfer.ServeFileCtx(w, r, path, s.limit, t.Context(), t.Add)
 	s.reg.Finish(t)
 	if err != nil {
 		s.log.Warn("download cancelled", "path", r.URL.Query().Get("path"), "sent", n)
+		s.record(history.Entry{Name: filepath.Base(path), Kind: "download", Size: n, Millis: time.Since(start).Milliseconds(), Status: "cancelled", CreatedAt: time.Now()})
 	} else {
+		s.record(history.Entry{Name: filepath.Base(path), Kind: "download", Size: n, Millis: time.Since(start).Milliseconds(), Status: "completed", CreatedAt: time.Now()})
 		s.countDrop()
+	}
+}
+
+// record appends to history; nil store or error only logs.
+func (s *Server) record(e history.Entry) {
+	if s.hist == nil {
+		return
+	}
+	if err := s.hist.Record(e); err != nil {
+		s.log.Warn("history record failed", "error", err)
 	}
 }
 
@@ -81,16 +97,19 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	prog := &transfer.Progress{Total: header.Size}
 	hasher := transfer.NewHasher()
 	t.SetMeta(name, header.Size)
+	upStart := time.Now()
 	written, err := transfer.CopyCtx(hasher.Writer(out), prog.Reader(transfer.Throttle(file, s.limit)), t.Context(), t.Add)
 	_ = out.Close()
 	if err != nil {
 		_ = os.Remove(dst)
 		s.log.Warn("upload cancelled", "path", dst, "error", err)
+		s.record(history.Entry{Name: name, Kind: "upload", Size: written, Millis: time.Since(upStart).Milliseconds(), Status: "cancelled", CreatedAt: time.Now()})
 		writeError(w, http.StatusBadRequest, "Transfer cancelled")
 		return
 	}
 	sum := hasher.Sum()
 	s.log.Info("upload completed", "path", dst, "progress", prog.String(), "sha256", sum)
+	s.record(history.Entry{Name: name, Kind: "upload", Size: written, Millis: time.Since(upStart).Milliseconds(), SHA256: sum, Status: "completed", CreatedAt: time.Now()})
 	writeJSON(w, http.StatusCreated, map[string]any{"name": name, "size": written, "checksum": "sha256:" + sum})
 }
 
@@ -160,4 +179,19 @@ func (s *Server) handleTransferCancel(w http.ResponseWriter, r *http.Request) {
 	}
 	s.log.Info("transfer cancelled by user", "id", r.PathValue("id"))
 	writeJSON(w, http.StatusOK, map[string]any{"cancelled": r.PathValue("id")})
+}
+
+func (s *Server) handleHistory(w http.ResponseWriter, r *http.Request) {
+	if s.hist == nil {
+		writeJSON(w, http.StatusOK, map[string]any{"entries": []history.Entry{}})
+		return
+	}
+	limit, _ := strconv.Atoi(r.URL.Query().Get("limit"))
+	offset, _ := strconv.Atoi(r.URL.Query().Get("offset"))
+	entries, err := s.hist.List(limit, offset)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "History unavailable")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"entries": entries})
 }
