@@ -18,7 +18,10 @@ func (s *Server) requireToken(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
-		if r.Method == http.MethodGet && strings.HasPrefix(r.URL.Path, "/api/v1/shares/") {
+		// Share-token URLs carry their own auth in the path segment:
+		// GET download and POST upload to /api/v1/shares/<token>[...].
+		// Bare POST /api/v1/shares (create) still needs the server token.
+		if strings.HasPrefix(r.URL.Path, "/api/v1/shares/") {
 			next.ServeHTTP(w, r)
 			return
 		}

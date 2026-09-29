@@ -18,6 +18,7 @@ var (
 	sharePin     string
 	shareExpires string
 	shareNeedPIN bool
+	shareUpload  bool
 )
 
 var shareCmd = &cobra.Command{
@@ -40,6 +41,7 @@ var shareCmd = &cobra.Command{
 			"path":            args[0],
 			"expires_minutes": int(dur.Minutes()),
 			"pin_required":    shareNeedPIN,
+			"allow_upload":    shareUpload,
 		})
 		req, err := http.NewRequest("POST", apiURL(shareFrom, "/api/v1/shares"), bytes.NewReader(body))
 		if err != nil {
@@ -80,5 +82,6 @@ func init() {
 	shareCmd.Flags().StringVar(&sharePin, "pin", "", "server PIN (or LANBOX_PIN)")
 	shareCmd.Flags().StringVar(&shareExpires, "expires", "30m", "share lifetime (max 24h)")
 	shareCmd.Flags().BoolVar(&shareNeedPIN, "pin-require", false, "protect the share with a PIN")
+	shareCmd.Flags().BoolVar(&shareUpload, "upload", false, "share a directory as an upload inbox")
 	rootCmd.AddCommand(shareCmd)
 }
