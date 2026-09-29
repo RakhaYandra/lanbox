@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/RakhaYandra/lanbox/internal/auth"
+	"github.com/RakhaYandra/lanbox/internal/transfer"
 )
 
 // Server wires routes to handlers.
@@ -28,11 +29,12 @@ type Server struct {
 	dropFile string // resolved single-file path, "" = off
 	dropLeft int32
 	shutdown func(context.Context) error
+	reg      *transfer.Registry
 }
 
 // New builds the server without starting it.
 func New(root, host string, port int, webDir string, token auth.Token, log *slog.Logger) *Server {
-	s := &Server{root: root, host: host, port: port, webDir: webDir, token: token, log: log, mux: http.NewServeMux(), sem: make(chan struct{}, 4), shares: NewShareStore()}
+	s := &Server{root: root, host: host, port: port, webDir: webDir, token: token, log: log, mux: http.NewServeMux(), sem: make(chan struct{}, 4), shares: NewShareStore(), reg: transfer.NewRegistry()}
 	s.routes()
 	return s
 }

@@ -27,7 +27,10 @@ func (s *Server) handleDownload(w http.ResponseWriter, r *http.Request) {
 		}
 		return
 	}
-	if n, err := transfer.ServeFileLimit(w, r, path, s.limit); err != nil {
+	t := s.reg.Start(r.Context(), filepath.Base(path), fileSize(path))
+	n, err := transfer.ServeFileCtx(w, r, path, s.limit, t.Context(), t.Add)
+	s.reg.Finish(t)
+	if err != nil {
 		s.log.Warn("download cancelled", "path", r.URL.Query().Get("path"), "sent", n)
 	} else {
 		s.countDrop()
@@ -44,6 +47,10 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "Invalid path")
 		return
 	}
+	// Register before FormFile: parsing buffers the whole body, so an entry
+	// created later would never be visible mid-receipt.
+	t := s.reg.Start(r.Context(), "(receiving)", r.ContentLength)
+	defer s.reg.Finish(t)
 	file, header, err := r.FormFile("file")
 	if err != nil {
 		if r.Context().Err() != nil {
@@ -73,7 +80,8 @@ func (s *Server) handleUpload(w http.ResponseWriter, r *http.Request) {
 	}
 	prog := &transfer.Progress{Total: header.Size}
 	hasher := transfer.NewHasher()
-	written, err := io.Copy(hasher.Writer(out), prog.Reader(transfer.Throttle(file, s.limit)))
+	t.SetMeta(name, header.Size)
+	written, err := transfer.CopyCtx(hasher.Writer(out), prog.Reader(transfer.Throttle(file, s.limit)), t.Context(), t.Add)
 	_ = out.Close()
 	if err != nil {
 		_ = os.Remove(dst)
@@ -126,4 +134,30 @@ func (s *Server) handleDelete(w http.ResponseWriter, r *http.Request) {
 	}
 	s.log.Info("deleted", "path", r.URL.Query().Get("path"))
 	writeJSON(w, http.StatusOK, map[string]any{"deleted": r.URL.Query().Get("path")})
+}
+
+// fileSize returns the file size or 0 when unknown.
+func fileSize(path string) int64 {
+	info, err := os.Stat(path)
+	if err != nil || info.IsDir() {
+		return 0
+	}
+	return info.Size()
+}
+
+func (s *Server) handleTransfers(w http.ResponseWriter, r *http.Request) {
+	items := s.reg.List()
+	if items == nil {
+		items = []transfer.TView{}
+	}
+	writeJSON(w, http.StatusOK, map[string]any{"transfers": items})
+}
+
+func (s *Server) handleTransferCancel(w http.ResponseWriter, r *http.Request) {
+	if !s.reg.Cancel(r.PathValue("id")) {
+		writeError(w, http.StatusNotFound, "Not found")
+		return
+	}
+	s.log.Info("transfer cancelled by user", "id", r.PathValue("id"))
+	writeJSON(w, http.StatusOK, map[string]any{"cancelled": r.PathValue("id")})
 }

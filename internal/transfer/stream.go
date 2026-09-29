@@ -1,6 +1,7 @@
 package transfer
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"mime"
@@ -20,6 +21,12 @@ func ServeFile(w http.ResponseWriter, r *http.Request, path string) (int64, erro
 
 // ServeFileLimit streams with an optional bytes-per-second cap (0 = unlimited).
 func ServeFileLimit(w http.ResponseWriter, r *http.Request, path string, bps int64) (int64, error) {
+	return ServeFileCtx(w, r, path, bps, r.Context(), nil)
+}
+
+// ServeFileCtx streams like ServeFileLimit but aborts on ctx (registry
+// cancel) and reports progress via onN. Range + throttle supported.
+func ServeFileCtx(w http.ResponseWriter, r *http.Request, path string, bps int64, ctx context.Context, onN func(int64)) (int64, error) {
 	f, err := os.Open(path)
 	if err != nil {
 		http.Error(w, "Not found", http.StatusNotFound)
@@ -48,10 +55,10 @@ func ServeFileLimit(w http.ResponseWriter, r *http.Request, path string, bps int
 		w.Header().Set("Content-Range", fmt.Sprintf("bytes %d-%d/%d", start, size-1, size))
 		w.Header().Set("Content-Length", strconv.FormatInt(size-start, 10))
 		w.WriteHeader(http.StatusPartialContent)
-		return io.Copy(w, Throttle(f, bps))
+		return CopyCtx(w, Throttle(f, bps), ctx, onN)
 	}
 	w.Header().Set("Content-Length", strconv.FormatInt(size, 10))
-	return io.Copy(w, Throttle(f, bps))
+	return CopyCtx(w, Throttle(f, bps), ctx, onN)
 }
 
 // MaxPreviewBytes caps inline previews; larger files must download.

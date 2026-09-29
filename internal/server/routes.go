@@ -19,6 +19,8 @@ func (s *Server) routes() {
 	s.mux.Handle("GET /api/v1/shares/{token}", s.limitSlots(http.HandlerFunc(s.handleShareGet)))
 	s.mux.Handle("POST /api/v1/shares/{token}/files", s.limitSlots(http.HandlerFunc(s.handleShareUpload)))
 	s.mux.HandleFunc("DELETE /api/v1/files", s.handleDelete)
+	s.mux.HandleFunc("GET /api/v1/transfers", s.handleTransfers)
+	s.mux.HandleFunc("DELETE /api/v1/transfers/{id}", s.handleTransferCancel)
 	if s.webDir != "" {
 		s.mux.Handle("/", http.FileServer(http.Dir(s.webDir)))
 	}
